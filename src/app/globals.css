@@ -1,0 +1,277 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f3f2ef;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --muted: #e6e7e9;
+  --accent: #0a66c2;
+  --surface-rgb: 255, 255, 255;
+  --muted-surface-rgb: 248, 250, 252;
+  --body-gradient:
+    radial-gradient(circle at 20% 20%, rgba(10, 102, 194, 0.05), transparent 26%),
+    radial-gradient(circle at 80% 0%, rgba(10, 102, 194, 0.05), transparent 32%),
+    var(--background);
+  --page-image-overlay: linear-gradient(135deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.02));
+  --hero-cover-overlay: linear-gradient(180deg, rgba(15, 23, 42, 0.08), rgba(15, 23, 42, 0.03) 44%, rgba(255, 255, 255, 0.72));
+  --usage-chart-surface: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.9),
+    rgba(241, 245, 249, 0.94) 32%,
+    rgba(226, 232, 240, 0.88)
+  );
+  --chart-grid: #dbe3ec;
+  --chart-axis: #334155;
+  --chart-axis-muted: #64748b;
+  --chart-cursor: rgba(148, 163, 184, 0.1);
+  --chart-fresh: #10b981;
+  --chart-fresh-active: #0284c7;
+  --chart-cached: #fbbf24;
+  --chart-cached-active: #f59e0b;
+  --tooltip-background: rgba(255, 255, 255, 0.95);
+  --tooltip-border: rgba(226, 232, 240, 0.95);
+  --tooltip-shadow: rgba(148, 163, 184, 0.35);
+}
+
+:root[data-color-theme="dark"] {
+  --background: #020817;
+  --foreground: #e2e8f0;
+  --card: #0f172a;
+  --muted: #111c2d;
+  --accent: #38bdf8;
+  --surface-rgb: 8, 15, 28;
+  --muted-surface-rgb: 15, 23, 42;
+  --body-gradient:
+    radial-gradient(circle at 18% 18%, rgba(56, 189, 248, 0.16), transparent 24%),
+    radial-gradient(circle at 82% 0%, rgba(14, 165, 233, 0.16), transparent 30%),
+    linear-gradient(180deg, rgba(2, 6, 23, 0.98), rgba(15, 23, 42, 0.98));
+  --page-image-overlay: linear-gradient(135deg, rgba(2, 6, 23, 0.8), rgba(15, 23, 42, 0.68));
+  --hero-cover-overlay: linear-gradient(180deg, rgba(2, 6, 23, 0.08), rgba(2, 6, 23, 0.18) 44%, rgba(2, 6, 23, 0.74));
+  --usage-chart-surface: linear-gradient(
+    180deg,
+    rgba(8, 15, 28, 0.94),
+    rgba(15, 23, 42, 0.95) 38%,
+    rgba(17, 24, 39, 0.97)
+  );
+  --chart-grid: rgba(100, 116, 139, 0.28);
+  --chart-axis: #e2e8f0;
+  --chart-axis-muted: #94a3b8;
+  --chart-cursor: rgba(51, 65, 85, 0.24);
+  --chart-fresh: #34d399;
+  --chart-fresh-active: #38bdf8;
+  --chart-cached: #f59e0b;
+  --chart-cached-active: #fbbf24;
+  --tooltip-background: rgba(8, 15, 28, 0.96);
+  --tooltip-border: rgba(51, 65, 85, 0.9);
+  --tooltip-shadow: rgba(2, 6, 23, 0.62);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-accent: var(--accent);
+  --color-muted: var(--muted);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--body-gradient);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  transition: background-color 180ms ease, background-image 180ms ease, color 180ms ease;
+}
+
+a {
+  color: var(--accent);
+}
+
+html {
+  background: var(--background);
+  color-scheme: light;
+  scrollbar-color: rgba(148, 163, 184, 0.6) transparent;
+}
+
+html[data-color-theme="dark"] {
+  color-scheme: dark;
+  scrollbar-color: rgba(71, 85, 105, 0.9) transparent;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 25%, transparent);
+  color: var(--foreground);
+}
+
+.profile-cover-overlay {
+  background: var(--hero-cover-overlay);
+}
+
+.logo-circle-placeholder {
+  background: linear-gradient(135deg, rgba(var(--muted-surface-rgb), 0.98), rgba(var(--surface-rgb), 0.88));
+}
+
+:root[data-color-theme="dark"] .bg-slate-100 {
+  background-color: rgba(15, 23, 42, 0.9) !important;
+}
+
+:root[data-color-theme="dark"] .bg-slate-50,
+:root[data-color-theme="dark"] .bg-slate-50\/70,
+:root[data-color-theme="dark"] .bg-slate-50\/80 {
+  background-color: rgba(15, 23, 42, 0.8) !important;
+}
+
+:root[data-color-theme="dark"] .bg-white {
+  background-color: rgba(8, 15, 28, 0.92) !important;
+}
+
+:root[data-color-theme="dark"] .bg-white\/70,
+:root[data-color-theme="dark"] .bg-white\/75,
+:root[data-color-theme="dark"] .bg-white\/80,
+:root[data-color-theme="dark"] .bg-white\/90,
+:root[data-color-theme="dark"] .bg-white\/95 {
+  background-color: rgba(8, 15, 28, 0.84) !important;
+}
+
+:root[data-color-theme="dark"] .text-slate-300 {
+  color: #cbd5e1 !important;
+}
+
+:root[data-color-theme="dark"] .text-slate-400 {
+  color: #94a3b8 !important;
+}
+
+:root[data-color-theme="dark"] .text-slate-500 {
+  color: #94a3b8 !important;
+}
+
+:root[data-color-theme="dark"] .text-slate-600 {
+  color: #cbd5e1 !important;
+}
+
+:root[data-color-theme="dark"] .text-slate-700 {
+  color: #dbeafe !important;
+}
+
+:root[data-color-theme="dark"] .text-slate-800 {
+  color: #e2e8f0 !important;
+}
+
+:root[data-color-theme="dark"] .text-slate-900 {
+  color: #f8fafc !important;
+}
+
+:root[data-color-theme="dark"] .text-red-600 {
+  color: #fca5a5 !important;
+}
+
+:root[data-color-theme="dark"] .placeholder\:text-slate-400::placeholder {
+  color: #64748b !important;
+}
+
+:root[data-color-theme="dark"] .border-slate-100,
+:root[data-color-theme="dark"] .border-slate-200,
+:root[data-color-theme="dark"] .border-slate-200\/70,
+:root[data-color-theme="dark"] .border-slate-200\/80,
+:root[data-color-theme="dark"] .border-slate-300,
+:root[data-color-theme="dark"] .border-slate-400 {
+  border-color: rgba(71, 85, 105, 0.58) !important;
+}
+
+:root[data-color-theme="dark"] .border-white,
+:root[data-color-theme="dark"] .border-white\/10,
+:root[data-color-theme="dark"] .border-white\/30,
+:root[data-color-theme="dark"] .border-white\/60 {
+  border-color: rgba(148, 163, 184, 0.28) !important;
+}
+
+:root[data-color-theme="dark"] .divide-slate-100 > :not([hidden]) ~ :not([hidden]) {
+  border-color: rgba(71, 85, 105, 0.42) !important;
+}
+
+:root[data-color-theme="dark"] .bg-emerald-50 {
+  background-color: rgba(6, 95, 70, 0.2) !important;
+}
+
+:root[data-color-theme="dark"] .text-emerald-700,
+:root[data-color-theme="dark"] .text-emerald-800 {
+  color: #6ee7b7 !important;
+}
+
+:root[data-color-theme="dark"] .bg-amber-50 {
+  background-color: rgba(146, 64, 14, 0.22) !important;
+}
+
+:root[data-color-theme="dark"] .text-amber-700,
+:root[data-color-theme="dark"] .text-amber-800 {
+  color: #fcd34d !important;
+}
+
+:root[data-color-theme="dark"] .bg-sky-50 {
+  background-color: rgba(3, 105, 161, 0.22) !important;
+}
+
+:root[data-color-theme="dark"] .bg-sky-100 {
+  background-color: rgba(3, 105, 161, 0.28) !important;
+}
+
+:root[data-color-theme="dark"] .text-sky-300 {
+  color: #bae6fd !important;
+}
+
+:root[data-color-theme="dark"] .text-sky-700,
+:root[data-color-theme="dark"] .text-sky-800 {
+  color: #7dd3fc !important;
+}
+
+:root[data-color-theme="dark"] .bg-rose-50 {
+  background-color: rgba(136, 19, 55, 0.2) !important;
+}
+
+:root[data-color-theme="dark"] .text-rose-700 {
+  color: #fda4af !important;
+}
+
+:root[data-color-theme="dark"] .ring-slate-200 {
+  --tw-ring-color: rgba(71, 85, 105, 0.58) !important;
+}
+
+:root[data-color-theme="dark"] .ring-sky-100 {
+  --tw-ring-color: rgba(56, 189, 248, 0.28) !important;
+}
+
+:root[data-color-theme="dark"] .ring-emerald-100,
+:root[data-color-theme="dark"] .ring-emerald-200 {
+  --tw-ring-color: rgba(52, 211, 153, 0.24) !important;
+}
+
+:root[data-color-theme="dark"] .ring-amber-100,
+:root[data-color-theme="dark"] .ring-amber-200 {
+  --tw-ring-color: rgba(245, 158, 11, 0.26) !important;
+}
+
+:root[data-color-theme="dark"] .ring-rose-100 {
+  --tw-ring-color: rgba(244, 63, 94, 0.24) !important;
+}
+
+:root[data-color-theme="dark"] .hover\:bg-slate-50:hover {
+  background-color: rgba(30, 41, 59, 0.92) !important;
+}
+
+:root[data-color-theme="dark"] .hover\:bg-white:hover {
+  background-color: rgba(15, 23, 42, 0.96) !important;
+}
+
+:root[data-color-theme="dark"] .shadow-slate-200,
+:root[data-color-theme="dark"] .shadow-slate-200\/40,
+:root[data-color-theme="dark"] .shadow-slate-200\/50,
+:root[data-color-theme="dark"] .shadow-slate-200\/70,
+:root[data-color-theme="dark"] .shadow-slate-300\/30,
+:root[data-color-theme="dark"] .shadow-slate-300\/40,
+:root[data-color-theme="dark"] .shadow-slate-300\/50 {
+  --tw-shadow-color: rgba(2, 6, 23, 0.62) !important;
+}
+
+:root[data-color-theme="dark"] .shadow-sky-100\/30,
+:root[data-color-theme="dark"] .shadow-sky-200 {
+  --tw-shadow-color: rgba(14, 165, 233, 0.2) !important;
+}
