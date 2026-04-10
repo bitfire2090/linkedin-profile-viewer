@@ -102,6 +102,12 @@ type EmailSubmitResponse = {
   record: EmailLookupRecord | null;
 };
 
+type SearchFinder = {
+  id: string;
+  username: string;
+  foundAt: string;
+};
+
 class ClientApiError extends Error {
   status: number;
   code?: string;
@@ -133,6 +139,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [statusTone, setStatusTone] = useState<"cache" | "fresh" | null>(null);
+  const [cacheFinder, setCacheFinder] = useState<SearchFinder | null>(null);
   const [themeMode, setThemeMode] = useState<ThemeMode>("light");
   const [themeReady, setThemeReady] = useState(false);
   const [themeOpen, setThemeOpen] = useState(false);
@@ -430,6 +437,7 @@ export default function Home() {
       setLoading(true);
       setError(null);
       setStatus(null);
+      setCacheFinder(null);
 
       const payload = await fetchJson<{
         id: string;
@@ -437,6 +445,7 @@ export default function Home() {
         profile: LinkedInProfile;
         source: "cache" | "fresh";
         createdAt: string;
+        foundBy: SearchFinder | null;
       }>("/api/search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -445,12 +454,14 @@ export default function Home() {
       setProfile(payload.profile);
       setStatus(payload.source === "cache" ? "Loaded from cache." : "Fresh scrape completed.");
       setStatusTone(payload.source);
+      setCacheFinder(payload.source === "cache" ? payload.foundBy : null);
       setInputUrl(payload.url ?? inputUrl);
       void loadHistory(1);
       void loadUsage();
     } catch (err) {
       setError(handleProtectedError(err, "Search failed."));
       setStatusTone(null);
+      setCacheFinder(null);
     } finally {
       setLoading(false);
     }
@@ -512,6 +523,7 @@ export default function Home() {
     setProfile(item.profile);
     setStatus(`Loaded cached result from ${formatDate(item.createdAt)}`);
     setStatusTone("cache");
+    setCacheFinder(null);
     setInputUrl(item.url);
   }
 
@@ -580,6 +592,7 @@ export default function Home() {
     setError(null);
     setStatus(null);
     setStatusTone(null);
+    setCacheFinder(null);
     setEmailInput("");
     setEmailLookup(null);
     setEmailLookupLoading(false);
@@ -764,15 +777,23 @@ export default function Home() {
               </form>
               {status ? (
                 <div
-                  className={`mt-3 flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold ${
+                  className={`mt-3 flex items-start gap-2 rounded-xl px-3 py-2 text-sm font-semibold ${
                     statusTone === "cache"
                       ? "bg-amber-50 text-amber-800 ring-1 ring-amber-200"
                       : "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200"
                   }`}
                   role="alert"
                 >
-                  <span className="inline-block h-2 w-2 rounded-full bg-current" />
-                  {status}
+                  <span className="mt-1.5 inline-block h-2 w-2 rounded-full bg-current" />
+                  <div className="min-w-0">
+                    <p>{status}</p>
+                    {statusTone === "cache" && cacheFinder ? (
+                      <p className="mt-1 text-md font-medium opacity-90">
+                        Already found by <span className="text-sky-600 font-bold">{cacheFinder.username}</span> on{" "}
+                        {formatDate(cacheFinder.foundAt)}.
+                      </p>
+                    ) : null}
+                  </div>
                 </div>
               ) : null}
               {error ? <p className="mt-3 text-sm font-medium text-red-600">{error}</p> : null}
