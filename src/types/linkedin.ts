@@ -13,7 +13,7 @@ export interface LinkedInProfile {
   location?: ProfileLocation;
   objectUrn?: string;
   registeredAt?: string;
-  topSkills?: string;
+  topSkills?: unknown;
   connectionsCount?: number;
   followerCount?: number;
   verified?: boolean;

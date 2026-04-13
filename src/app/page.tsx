@@ -171,11 +171,7 @@ export default function Home() {
   const totalPages = useMemo(() => Math.max(1, Math.ceil(total / PAGE_SIZE)), [total]);
 
   const topSkillList = useMemo(() => {
-    const raw = profile?.topSkills ?? "";
-    return raw
-      .split(/\u2022|,/)
-      .map((skill) => skill.trim())
-      .filter(Boolean);
+    return normalizeTopSkills(profile?.topSkills);
   }, [profile?.topSkills]);
 
   const combinedSkills = useMemo(() => {
@@ -3172,6 +3168,48 @@ function getTodayDateInput() {
 function imageUrl(asset?: ImageAsset | null) {
   if (!asset) return undefined;
   return asset.url ?? asset.sizes?.[0]?.url;
+}
+
+const TOP_SKILL_TEXT_KEYS = ["name", "skill", "title", "text", "label", "value"] as const;
+
+function normalizeTopSkills(raw: unknown) {
+  const seen = new Set<string>();
+
+  return collectTopSkillValues(raw)
+    .flatMap((value) => value.split(/\u2022|,/))
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .filter((value) => {
+      const key = value.toLowerCase();
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
+}
+
+function collectTopSkillValues(value: unknown): string[] {
+  if (typeof value === "string") {
+    return [value];
+  }
+
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => collectTopSkillValues(item));
+  }
+
+  if (!value || typeof value !== "object") {
+    return [];
+  }
+
+  const record = value as Record<string, unknown>;
+  const prioritizedValues = TOP_SKILL_TEXT_KEYS.flatMap((key) => collectTopSkillValues(record[key]));
+
+  if (prioritizedValues.length) {
+    return prioritizedValues;
+  }
+
+  return Object.values(record).flatMap((item) => collectTopSkillValues(item));
 }
 
 function formatDateOnly(value: string) {
