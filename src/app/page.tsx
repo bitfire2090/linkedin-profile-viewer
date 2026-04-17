@@ -67,7 +67,7 @@ const BACKGROUND_OPTIONS = BACKGROUND_FILES.map((file) => ({
   label: prettifyFileName(file),
 }));
 
-type ActiveTab = "search" | "email" | "usage" | "admin";
+type ActiveTab = "search" | "multi" | "email" | "usage" | "admin";
 type AuthMode = "login" | "register";
 type AdminAction = "approve" | "disable" | "enable";
 type AdminSection = "users" | "tokens";
@@ -108,6 +108,25 @@ type SearchFinder = {
   foundAt: string;
 };
 
+type BatchSearchItem = {
+  inputUrl: string;
+  url: string;
+  profile: LinkedInProfile | null;
+  source: "cache" | "fresh" | null;
+  status: "exists" | "newly_found" | "error";
+  createdAt: string | null;
+  foundBy: SearchFinder | null;
+  error: string | null;
+};
+
+type BatchSearchResponse = {
+  items: BatchSearchItem[];
+  total: number;
+  existsCount: number;
+  newlyFoundCount: number;
+  errorCount: number;
+};
+
 class ClientApiError extends Error {
   status: number;
   code?: string;
@@ -127,6 +146,11 @@ export default function Home() {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [inputUrl, setInputUrl] = useState("");
+  const [batchInput, setBatchInput] = useState("");
+  const [batchResults, setBatchResults] = useState<BatchSearchItem[]>([]);
+  const [batchLoading, setBatchLoading] = useState(false);
+  const [batchError, setBatchError] = useState<string | null>(null);
+  const [batchSummary, setBatchSummary] = useState<Omit<BatchSearchResponse, "items"> | null>(null);
   const [emailInput, setEmailInput] = useState("");
   const [emailLookup, setEmailLookup] = useState<EmailLookupResponse | null>(null);
   const [emailLookupLoading, setEmailLookupLoading] = useState(false);
@@ -169,6 +193,7 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("search");
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(total / PAGE_SIZE)), [total]);
+  const batchUrlCount = useMemo(() => splitLinkedInUrlLines(batchInput).length, [batchInput]);
 
   const topSkillList = useMemo(() => {
     return normalizeTopSkills(profile?.topSkills);
@@ -463,6 +488,48 @@ export default function Home() {
     }
   }
 
+  async function handleBatchSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const urls = splitLinkedInUrlLines(batchInput);
+
+    if (!urls.length) {
+      setBatchError("Paste at least one LinkedIn profile URL.");
+      return;
+    }
+
+    if (urls.length > 100) {
+      setBatchError("You can check up to 100 LinkedIn URLs at a time.");
+      return;
+    }
+
+    try {
+      setBatchLoading(true);
+      setBatchError(null);
+      setBatchSummary(null);
+      setBatchResults([]);
+
+      const payload = await fetchJson<BatchSearchResponse>("/api/search/batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ urls }),
+      });
+
+      setBatchResults(payload.items ?? []);
+      setBatchSummary({
+        total: payload.total ?? 0,
+        existsCount: payload.existsCount ?? 0,
+        newlyFoundCount: payload.newlyFoundCount ?? 0,
+        errorCount: payload.errorCount ?? 0,
+      });
+      void loadHistory(1);
+      void loadUsage();
+    } catch (err) {
+      setBatchError(handleProtectedError(err, "Multi URL check failed."));
+    } finally {
+      setBatchLoading(false);
+    }
+  }
+
   async function handleEmailLookup(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!emailInput.trim()) return;
@@ -521,6 +588,23 @@ export default function Home() {
     setStatusTone("cache");
     setCacheFinder(null);
     setInputUrl(item.url);
+  }
+
+  function handleBatchResultOpen(item: BatchSearchItem) {
+    if (!item.profile) {
+      return;
+    }
+
+    setProfile(item.profile);
+    setInputUrl(item.url);
+    setStatus(item.status === "exists" ? "Loaded from batch cache results." : "Loaded from batch fresh results.");
+    setStatusTone(item.source);
+    setCacheFinder(item.source === "cache" ? item.foundBy : null);
+    setActiveTab("search");
+
+    window.setTimeout(() => {
+      scrollToSection("preview-section");
+    }, 0);
   }
 
   async function handleCopyProfile() {
@@ -589,6 +673,11 @@ export default function Home() {
     setStatus(null);
     setStatusTone(null);
     setCacheFinder(null);
+    setBatchInput("");
+    setBatchResults([]);
+    setBatchLoading(false);
+    setBatchError(null);
+    setBatchSummary(null);
     setEmailInput("");
     setEmailLookup(null);
     setEmailLookupLoading(false);
@@ -720,6 +809,7 @@ export default function Home() {
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div className="flex flex-wrap items-center gap-2">
               <TabButton label="Search" active={activeTab === "search"} onClick={() => setActiveTab("search")} />
+              <TabButton label="Multi" active={activeTab === "multi"} onClick={() => setActiveTab("multi")} />
               <TabButton label="Email" active={activeTab === "email"} onClick={() => setActiveTab("email")} />
               <TabButton label="Usage" active={activeTab === "usage"} onClick={() => setActiveTab("usage")} />
               {sessionUser.role === "admin" ? (
@@ -794,6 +884,33 @@ export default function Home() {
               ) : null}
               {error ? <p className="mt-3 text-sm font-medium text-red-600">{error}</p> : null}
             </>
+          ) : activeTab === "multi" ? (
+            <div className="mt-4 rounded-2xl border border-slate-200 bg-white/70 px-4 py-4 shadow-inner">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.25em] text-sky-700">Multi URL Check</p>
+                  <h2 className="mt-1 text-lg font-bold text-slate-900">Check many LinkedIn profiles in one run</h2>
+                </div>
+                <div className="flex flex-wrap gap-2 text-xs font-semibold">
+                  <span className="rounded-full bg-sky-50 px-3 py-1 text-sky-700 ring-1 ring-sky-100">
+                    {batchUrlCount} URL{batchUrlCount === 1 ? "" : "s"} ready
+                  </span>
+                  {batchSummary ? (
+                    <>
+                      <span className="rounded-full bg-amber-50 px-3 py-1 text-amber-700 ring-1 ring-amber-100">
+                        {batchSummary.existsCount} exists
+                      </span>
+                      <span className="rounded-full bg-emerald-50 px-3 py-1 text-emerald-700 ring-1 ring-emerald-100">
+                        {batchSummary.newlyFoundCount} newly found
+                      </span>
+                      <span className="rounded-full bg-rose-50 px-3 py-1 text-rose-700 ring-1 ring-rose-100">
+                        {batchSummary.errorCount} errors
+                      </span>
+                    </>
+                  ) : null}
+                </div>
+              </div>
+            </div>
           ) : activeTab === "email" ? (
             <>
               <form className="mt-4" onSubmit={handleEmailLookup}>
@@ -1042,6 +1159,132 @@ export default function Home() {
                 </div>
               </div>
             </aside>
+          </div>
+        ) : null}
+
+        {activeTab === "multi" ? (
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
+            <section className="space-y-6">
+              <div className="rounded-3xl border border-slate-100 p-6 shadow-sm shadow-slate-200/40" style={surfaceStyle}>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold uppercase tracking-[0.25em] text-sky-700">Input</p>
+                    <h2 className="mt-1 text-lg font-bold text-slate-900">Paste LinkedIn profile URLs</h2>
+                  </div>
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                    Max 100 URLs
+                  </span>
+                </div>
+
+                <form className="mt-5 space-y-4" onSubmit={handleBatchSearch}>
+                  <div className="rounded-[28px] border border-slate-200 bg-white/80 p-3 shadow-inner ring-1 ring-transparent focus-within:ring-2 focus-within:ring-sky-500">
+                    <textarea
+                      id="linkedin-multi-input"
+                      value={batchInput}
+                      onChange={(event) => setBatchInput(event.target.value)}
+                      placeholder={`https://www.linkedin.com/in/sawyersweet\nhttps://www.linkedin.com/in/johnathan-burgess-7227a392\nhttps://www.linkedin.com/in/alan-andersen-725aa98`}
+                      rows={12}
+                      className="min-h-[280px] w-full resize-y bg-transparent px-2 py-1 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+                          event.currentTarget.form?.requestSubmit();
+                        }
+                      }}
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex flex-wrap gap-2 text-xs font-semibold">
+                      <span className="rounded-full bg-sky-50 px-3 py-1 text-sky-700 ring-1 ring-sky-100">
+                        {batchUrlCount} parsed
+                      </span>
+                      <span className="rounded-full bg-white px-3 py-1 text-slate-600 ring-1 ring-slate-200">
+                        Cmd/Ctrl + Enter runs the check
+                      </span>
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={batchLoading}
+                      className="inline-flex items-center justify-center gap-2 rounded-full bg-[#0a66c2] px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-sky-200 transition hover:bg-[#084a8f] disabled:cursor-not-allowed disabled:bg-slate-400"
+                    >
+                      {batchLoading ? (
+                        <>
+                          <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/60 border-t-transparent" />
+                          Checking URLs...
+                        </>
+                      ) : (
+                        <>Run multi check</>
+                      )}
+                    </button>
+                  </div>
+                </form>
+
+                {batchError ? <p className="mt-4 text-sm font-medium text-red-600">{batchError}</p> : null}
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-3">
+                <BatchSummaryStat
+                  label="Exists"
+                  value={batchSummary?.existsCount ?? 0}
+                  accentClassName="bg-amber-50 text-amber-700 ring-amber-100"
+                />
+                <BatchSummaryStat
+                  label="Newly Found"
+                  value={batchSummary?.newlyFoundCount ?? 0}
+                  accentClassName="bg-emerald-50 text-emerald-700 ring-emerald-100"
+                />
+                <BatchSummaryStat
+                  label="Errors"
+                  value={batchSummary?.errorCount ?? 0}
+                  accentClassName="bg-rose-50 text-rose-700 ring-rose-100"
+                />
+              </div>
+            </section>
+
+            <section className="space-y-4">
+              <div className="rounded-3xl border border-slate-100 shadow-sm" style={surfaceStyle}>
+                <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold uppercase tracking-[0.25em] text-sky-700">Results</p>
+                    <h2 className="text-lg font-bold text-slate-900">Per-profile status and preview</h2>
+                    <p className="mt-1 text-sm text-slate-600">
+                      Each card shows whether the URL already existed, was newly scraped, or failed.
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                    {batchSummary?.total ?? batchResults.length} result{(batchSummary?.total ?? batchResults.length) === 1 ? "" : "s"}
+                  </span>
+                </div>
+
+                <div className="px-5 py-5">
+                  {batchLoading ? (
+                    <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white/80 px-4 py-4 text-sm text-slate-600">
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-transparent" />
+                      Running cache checks and Apify scrapes...
+                    </div>
+                  ) : null}
+
+                  {!batchLoading && batchResults.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-slate-200 bg-white/60 px-5 py-8 text-center text-sm text-slate-500">
+                      Paste LinkedIn profile URLs on the left, then run the multi check to populate result cards here.
+                    </div>
+                  ) : null}
+
+                  {!batchLoading && batchResults.length > 0 ? (
+                    <div className="grid gap-4 md:grid-cols-2">
+                      {batchResults.map((item, index) => (
+                        <BatchProfileResultCard
+                          key={`${item.inputUrl}-${index}`}
+                          item={item}
+                          onOpenPreview={handleBatchResultOpen}
+                          surfaceStyle={mutedSurfaceStyle}
+                        />
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </section>
           </div>
         ) : null}
 
@@ -2749,6 +2992,138 @@ function ProfileHero({
   );
 }
 
+function BatchSummaryStat({
+  label,
+  value,
+  accentClassName,
+}: {
+  label: string;
+  value: number;
+  accentClassName: string;
+}) {
+  return (
+    <div className="rounded-3xl border border-slate-100 bg-white/75 px-4 py-4 shadow-sm">
+      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{label}</p>
+      <div className="mt-3 flex items-center justify-between gap-3">
+        <p className="text-2xl font-bold text-slate-900">{value.toLocaleString()}</p>
+        <span className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ${accentClassName}`}>{label}</span>
+      </div>
+    </div>
+  );
+}
+
+function BatchProfileResultCard({
+  item,
+  onOpenPreview,
+  surfaceStyle,
+}: {
+  item: BatchSearchItem;
+  onOpenPreview: (item: BatchSearchItem) => void;
+  surfaceStyle: CSSProperties;
+}) {
+  const profile = item.profile;
+  const name = buildDisplayName(profile) || profile?.publicIdentifier || "LinkedIn profile";
+  const avatarUrl = imageUrl(profile?.profilePicture) ?? imageUrl(profile?.photo);
+  const locationText = profile?.location?.linkedinText ?? profile?.location?.parsed?.text;
+  const currentCompanies = (profile?.currentPosition ?? [])
+    .map((position) => position.companyName)
+    .filter(Boolean)
+    .join(", ");
+  const metrics = [
+    profile?.followerCount ? `${formatCompactNumber(profile.followerCount)} followers` : null,
+    profile?.connectionsCount ? `${formatCompactNumber(profile.connectionsCount)} connections` : null,
+  ].filter(Boolean) as string[];
+  const { label, className } = batchStatusConfig(item.status);
+
+  return (
+    <article className="rounded-3xl border border-slate-100 p-5 shadow-sm shadow-slate-200/50" style={surfaceStyle}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-wrap gap-2">
+          <span className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ${className}`}>{label}</span>
+          {item.source ? (
+            <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200">
+              {item.source === "cache" ? "Cache hit" : "Fresh scrape"}
+            </span>
+          ) : null}
+        </div>
+        {item.createdAt ? <span className="text-xs text-slate-500">{formatDate(item.createdAt)}</span> : null}
+      </div>
+
+      <div className="mt-3 rounded-2xl bg-white/70 px-3 py-2 text-xs text-slate-600 ring-1 ring-slate-200">
+        <p className="line-clamp-2 break-all font-medium text-slate-700">{item.url}</p>
+        {item.inputUrl !== item.url ? <p className="mt-1 line-clamp-2 break-all text-slate-500">Input: {item.inputUrl}</p> : null}
+      </div>
+
+      {profile ? (
+        <>
+          <div className="mt-4 flex items-start gap-3">
+            <Avatar name={name} url={avatarUrl} size="sm" />
+            <div className="min-w-0 flex-1 space-y-1">
+              <p className="line-clamp-1 text-base font-semibold text-slate-900">{name}</p>
+              <p className="line-clamp-2 text-sm text-slate-700">{profile.headline || "No headline returned"}</p>
+              <p className="line-clamp-2 text-xs text-slate-500">
+                {[locationText, currentCompanies].filter(Boolean).join(" | ") || "No extra profile details returned"}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            {metrics.map((metric) => (
+              <span
+                key={metric}
+                className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200"
+              >
+                {metric}
+              </span>
+            ))}
+            {profile?.openToWork ? (
+              <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700 ring-1 ring-sky-100">
+                Open to work
+              </span>
+            ) : null}
+            {profile?.verified ? (
+              <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100">
+                Verified
+              </span>
+            ) : null}
+          </div>
+
+          {item.status === "exists" && item.foundBy ? (
+            <p className="mt-4 text-xs text-slate-600">
+              First found by <span className="font-semibold text-sky-700">{item.foundBy.username}</span> on{" "}
+              {formatDate(item.foundBy.foundAt)}.
+            </p>
+          ) : null}
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => onOpenPreview(item)}
+              className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+            >
+              Load full preview
+            </button>
+            {profile.linkedinUrl ? (
+              <a
+                href={profile.linkedinUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Open LinkedIn
+              </a>
+            ) : null}
+          </div>
+        </>
+      ) : (
+        <div className="mt-4 rounded-2xl border border-rose-100 bg-rose-50/80 px-4 py-4 text-sm text-rose-700">
+          {item.error ?? "Unable to load this profile."}
+        </div>
+      )}
+    </article>
+  );
+}
+
 function InfoSection({
   id,
   title,
@@ -3168,6 +3543,34 @@ function getTodayDateInput() {
 function imageUrl(asset?: ImageAsset | null) {
   if (!asset) return undefined;
   return asset.url ?? asset.sizes?.[0]?.url;
+}
+
+function splitLinkedInUrlLines(value: string) {
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+function batchStatusConfig(status: BatchSearchItem["status"]) {
+  if (status === "exists") {
+    return {
+      label: "Exists",
+      className: "bg-amber-50 text-amber-700 ring-amber-100",
+    };
+  }
+
+  if (status === "newly_found") {
+    return {
+      label: "Newly found",
+      className: "bg-emerald-50 text-emerald-700 ring-emerald-100",
+    };
+  }
+
+  return {
+    label: "Error",
+    className: "bg-rose-50 text-rose-700 ring-rose-100",
+  };
 }
 
 const TOP_SKILL_TEXT_KEYS = ["name", "skill", "title", "text", "label", "value"] as const;

@@ -24,6 +24,13 @@ export const searchBodySchema = z.object({
     .transform((value) => normalizeLinkedInUrl(value)),
 });
 
+export const batchSearchBodySchema = z.object({
+  urls: z
+    .array(z.string())
+    .min(1, "At least one LinkedIn URL is required")
+    .max(100, "You can check up to 100 LinkedIn URLs at a time"),
+});
+
 export const emailLookupSchema = z.object({
   email: z
     .string()
