@@ -110,11 +110,27 @@ export function normalizeLinkedInUrl(raw: string) {
     throw new Error("Please provide a valid linkedin.com URL");
   }
 
+  parsed.protocol = "https:";
+  parsed.username = "";
+  parsed.password = "";
+  parsed.hostname = normalizeLinkedInHostname(parsed.hostname);
   parsed.hash = "";
   parsed.search = "";
-  parsed.pathname = parsed.pathname.replace(/\/+$/, "");
+  parsed.pathname = normalizeLinkedInPathname(parsed.pathname);
 
   return parsed.toString();
+}
+
+export function getLinkedInProfileIdentifier(raw: string) {
+  const normalizedUrl = normalizeLinkedInUrl(raw);
+  const parsed = new URL(normalizedUrl);
+  const segments = getPathSegments(parsed.pathname);
+
+  if (segments[0]?.toLowerCase() !== "in" || !segments[1]) {
+    return null;
+  }
+
+  return segments[1].toLowerCase();
 }
 
 export function normalizeEmail(raw: string) {
@@ -123,4 +139,24 @@ export function normalizeEmail(raw: string) {
 
 export function normalizeUsername(raw: string) {
   return raw.trim().toLowerCase();
+}
+
+function normalizeLinkedInHostname(hostname: string) {
+  const normalized = hostname.toLowerCase();
+  return normalized === "linkedin.com" ? "www.linkedin.com" : normalized;
+}
+
+function normalizeLinkedInPathname(pathname: string) {
+  const segments = getPathSegments(pathname);
+
+  if (segments[0]?.toLowerCase() === "in" && segments[1]) {
+    return `/in/${segments[1].toLowerCase()}`;
+  }
+
+  const normalized = pathname.replace(/\/+$/, "");
+  return normalized || "/";
+}
+
+function getPathSegments(pathname: string) {
+  return pathname.split("/").filter(Boolean);
 }

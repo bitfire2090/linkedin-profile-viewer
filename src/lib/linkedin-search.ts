@@ -1,10 +1,11 @@
 import "server-only";
 
+import type { Filter } from "mongodb";
 import type { LinkedInProfile } from "@/types/linkedin";
 import { scrapeLinkedInProfile, scrapeLinkedInProfiles } from "./apify";
 import { getSearchCollection, getSearchEventCollection, getUserCollection } from "./db";
 import type { SearchEventRecord, SearchRecord, UserRecord } from "./models";
-import { normalizeLinkedInUrl } from "./validation";
+import { getLinkedInProfileIdentifier, normalizeLinkedInUrl } from "./validation";
 
 export type SearchFinderDTO = {
   id: string;
@@ -71,9 +72,9 @@ export async function searchLinkedInUrls(rawUrls: string[], user: UserRecord): P
 
   const outcomeByUrl = new Map<string, LinkedInBatchSearchItemDTO>();
   const existingRecords = uniqueValidUrls.length
-    ? await collection.find({ url: { $in: uniqueValidUrls } }).toArray()
+    ? await collection.find(buildSearchRecordLookupFilter(uniqueValidUrls)).sort({ createdAt: 1 }).toArray()
     : [];
-  const existingByUrl = new Map(existingRecords.map((record) => [record.url, record]));
+  const existingByUrl = mapExistingRecordsByRequestedUrl(uniqueValidUrls, existingRecords);
 
   for (const url of uniqueValidUrls) {
     const cachedRecord = existingByUrl.get(url);
@@ -153,7 +154,7 @@ async function searchNormalizedLinkedInUrl(
   searchEvents: SearchEventCollection,
   now: Date,
 ) {
-  const existing = await collection.findOne({ url });
+  const existing = await findExistingSearchRecord(url, collection);
 
   if (existing) {
     return hydrateCachedSearchResult(existing, user, collection, searchEvents, now);
@@ -319,4 +320,89 @@ function resolveSearchErrorMessage(error: unknown, fallback: string) {
 
 function isDuplicateKeyError(error: unknown) {
   return typeof error === "object" && error !== null && "code" in error && error.code === 11000;
+}
+
+async function findExistingSearchRecord(url: string, collection: SearchCollection) {
+  const records = await collection.find(buildSearchRecordLookupFilter([url])).sort({ createdAt: 1 }).toArray();
+  return selectBestExistingRecord(url, records);
+}
+
+function mapExistingRecordsByRequestedUrl(requestedUrls: string[], records: SearchRecord[]) {
+  const existingByUrl = new Map<string, SearchRecord>();
+
+  for (const url of requestedUrls) {
+    const record = selectBestExistingRecord(url, records);
+
+    if (record) {
+      existingByUrl.set(url, record);
+    }
+  }
+
+  return existingByUrl;
+}
+
+function selectBestExistingRecord(requestedUrl: string, records: SearchRecord[]) {
+  const exact = records.find((record) => record.url === requestedUrl);
+
+  if (exact) {
+    return exact;
+  }
+
+  const normalized = records.find((record) => safeNormalizeLinkedInUrl(record.url) === requestedUrl);
+
+  if (normalized) {
+    return normalized;
+  }
+
+  const requestedProfileIdentifier = safeGetLinkedInProfileIdentifier(requestedUrl);
+
+  if (!requestedProfileIdentifier) {
+    return null;
+  }
+
+  return (
+    records.find((record) => safeGetLinkedInProfileIdentifier(record.url) === requestedProfileIdentifier) ?? null
+  );
+}
+
+function buildSearchRecordLookupFilter(urls: string[]): Filter<SearchRecord> {
+  const profileIdentifierFilters = Array.from(
+    new Set(urls.flatMap((url) => {
+      const identifier = safeGetLinkedInProfileIdentifier(url);
+      return identifier ? [identifier] : [];
+    })),
+  ).map((identifier) => ({
+    url: {
+      $regex: buildLinkedInProfileIdentifierRegex(identifier),
+      $options: "i",
+    },
+  }));
+
+  return {
+    $or: [{ url: { $in: urls } }, ...profileIdentifierFilters],
+  };
+}
+
+function buildLinkedInProfileIdentifierRegex(identifier: string) {
+  return `^https?:\\/\\/(?:www\\.)?linkedin\\.com\\/in\\/${escapeRegex(identifier)}(?:[\\/?#]|$)`;
+}
+
+function safeNormalizeLinkedInUrl(url: string) {
+  try {
+    return normalizeLinkedInUrl(url);
+  } catch {
+    return null;
+  }
+}
+
+function safeGetLinkedInProfileIdentifier(url: string) {
+  try {
+    return getLinkedInProfileIdentifier(url);
+  } catch {
+    return null;
+  }
+}
+
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
