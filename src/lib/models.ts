@@ -55,6 +55,14 @@ export interface ApifyTokenRecord {
   updatedAt: Date;
 }
 
+export interface AppSettingsRecord {
+  _id?: ObjectId;
+  key: "global";
+  apifyActorId: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface RocketReachRecord {
   _id?: ObjectId;
   profileId?: number | null;

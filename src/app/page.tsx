@@ -2,6 +2,7 @@
 
 import { CSSProperties, FormEvent, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import {
+  ApifyActorSettingsDTO,
   ApifyTokenDTO,
   AuthMutationResponse,
   AuthSessionDTO,
@@ -1991,6 +1992,12 @@ function AdminPanel({
   const [apifyTokensLoading, setApifyTokensLoading] = useState(false);
   const [apifyTokensError, setApifyTokensError] = useState<string | null>(null);
   const [apifyTokensMessage, setApifyTokensMessage] = useState<string | null>(null);
+  const [apifyActorSettings, setApifyActorSettings] = useState<ApifyActorSettingsDTO | null>(null);
+  const [apifyActorId, setApifyActorId] = useState("");
+  const [apifyActorLoading, setApifyActorLoading] = useState(false);
+  const [apifyActorSaving, setApifyActorSaving] = useState(false);
+  const [apifyActorError, setApifyActorError] = useState<string | null>(null);
+  const [apifyActorMessage, setApifyActorMessage] = useState<string | null>(null);
   const [editingTokenId, setEditingTokenId] = useState<string | null>(null);
   const [apifyTokenValue, setApifyTokenValue] = useState("");
   const [apifyTokenMetadata, setApifyTokenMetadata] = useState("");
@@ -2001,6 +2008,7 @@ function AdminPanel({
   const isEditingApifyToken = Boolean(editingTokenId);
   const handleLoadApifyTokensEffect = useEffectEvent(() => {
     void loadApifyTokens();
+    void loadApifyActorSettings();
   });
 
   useEffect(() => {
@@ -2019,6 +2027,15 @@ function AdminPanel({
     const timer = window.setTimeout(() => setApifyTokensMessage(null), 2500);
     return () => window.clearTimeout(timer);
   }, [apifyTokensMessage]);
+
+  useEffect(() => {
+    if (!apifyActorMessage) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => setApifyActorMessage(null), 2500);
+    return () => window.clearTimeout(timer);
+  }, [apifyActorMessage]);
 
   if (loading && !dashboard) {
     return (
@@ -2060,6 +2077,54 @@ function AdminPanel({
       return [];
     } finally {
       setApifyTokensLoading(false);
+    }
+  }
+
+  async function loadApifyActorSettings() {
+    try {
+      setApifyActorLoading(true);
+      setApifyActorError(null);
+
+      const payload = await fetchJson<{ settings: ApifyActorSettingsDTO }>("/api/admin/apify-settings", {
+        cache: "no-store",
+      });
+      setApifyActorSettings(payload.settings);
+      setApifyActorId(payload.settings.selectedActorId);
+      return payload.settings;
+    } catch (err) {
+      setApifyActorError(onProtectedError(err, "Unable to load Apify actor settings."));
+      return null;
+    } finally {
+      setApifyActorLoading(false);
+    }
+  }
+
+  async function handleApifyActorSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!apifyActorId) {
+      setApifyActorError("Select an Apify actor.");
+      return;
+    }
+
+    try {
+      setApifyActorSaving(true);
+      setApifyActorError(null);
+      setApifyActorMessage(null);
+
+      const payload = await fetchJson<{ settings: ApifyActorSettingsDTO }>("/api/admin/apify-settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ actorId: apifyActorId }),
+      });
+
+      setApifyActorSettings(payload.settings);
+      setApifyActorId(payload.settings.selectedActorId);
+      setApifyActorMessage("Apify actor updated.");
+    } catch (err) {
+      setApifyActorError(onProtectedError(err, "Unable to update Apify actor."));
+    } finally {
+      setApifyActorSaving(false);
     }
   }
 
@@ -2202,9 +2267,9 @@ function AdminPanel({
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Controls</p>
-            <h3 className="mt-1 text-lg font-bold text-slate-900">Users and Apify token management</h3>
+            <h3 className="mt-1 text-lg font-bold text-slate-900">Users and Apify management</h3>
             <p className="mt-2 text-sm text-slate-600">
-              Approve users, disable access, and choose the single Apify token used for new searches.
+              Approve users, disable access, and choose the Apify actor and token used for new searches.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -2365,6 +2430,87 @@ function AdminPanel({
           </InfoSection>
         </>
       ) : (
+        <>
+        <InfoSection title="Apify Actor" surfaceStyle={surfaceStyle}>
+          <div className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
+            <form
+              onSubmit={handleApifyActorSubmit}
+              className="rounded-3xl border border-slate-100 p-5 shadow-sm shadow-slate-200/40"
+              style={mutedSurfaceStyle}
+            >
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Actor selection</p>
+                <h3 className="mt-1 text-lg font-bold text-slate-900">Global Apify actor</h3>
+                <p className="mt-2 text-sm text-slate-600">
+                  This actor is used for every uncached profile search across all users.
+                </p>
+              </div>
+
+              <label htmlFor="apify-actor-id" className="mt-5 block text-sm font-semibold text-slate-700">
+                Actor
+              </label>
+              <select
+                id="apify-actor-id"
+                value={apifyActorId}
+                onChange={(event) => setApifyActorId(event.target.value)}
+                disabled={apifyActorLoading || apifyActorSaving || !apifyActorSettings}
+                className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-inner focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+              >
+                {apifyActorSettings?.actors.map((actor) => (
+                  <option key={actor.id} value={actor.id}>
+                    {actor.label}
+                  </option>
+                ))}
+              </select>
+
+              {apifyActorError ? <p className="mt-4 text-sm font-medium text-red-600">{apifyActorError}</p> : null}
+              {apifyActorMessage ? (
+                <div className="mt-4 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800 ring-1 ring-emerald-100">
+                  {apifyActorMessage}
+                </div>
+              ) : null}
+
+              <div className="mt-5 flex flex-wrap gap-3">
+                <button
+                  type="submit"
+                  disabled={apifyActorLoading || apifyActorSaving || !apifyActorSettings}
+                  className="rounded-2xl bg-sky-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+                >
+                  {apifyActorSaving ? "Saving..." : "Save actor"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void loadApifyActorSettings()}
+                  disabled={apifyActorLoading || apifyActorSaving}
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100"
+                >
+                  {apifyActorLoading ? "Loading..." : "Refresh"}
+                </button>
+              </div>
+            </form>
+
+            <div
+              className="rounded-3xl border border-slate-100 p-5 shadow-sm shadow-slate-200/40"
+              style={mutedSurfaceStyle}
+            >
+              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Current actor</p>
+              <h3 className="mt-1 text-lg font-bold text-slate-900">
+                {apifyActorSettings?.selectedActor.label ?? "Loading actor settings"}
+              </h3>
+              <p className="mt-2 font-mono text-xs text-slate-600">
+                {apifyActorSettings?.selectedActorId ?? "No actor loaded"}
+              </p>
+              <p className="mt-3 text-sm leading-6 text-slate-700">
+                {apifyActorSettings?.selectedActor.description ??
+                  "Actor settings will load when this admin section opens."}
+              </p>
+              {apifyActorSettings?.updatedAt ? (
+                <p className="mt-4 text-xs text-slate-500">Updated {formatDate(apifyActorSettings.updatedAt)}</p>
+              ) : null}
+            </div>
+          </div>
+        </InfoSection>
+
         <InfoSection title="Apify Tokens" surfaceStyle={surfaceStyle}>
           <div className="grid gap-5 xl:grid-cols-[0.95fr_1.25fr]">
             <form
@@ -2602,6 +2748,7 @@ function AdminPanel({
             </div>
           </div>
         </InfoSection>
+        </>
       )}
     </div>
   );

@@ -1,6 +1,7 @@
 export interface LinkedInProfile {
   id?: string;
   publicIdentifier?: string;
+  profileUrl?: string;
   linkedinUrl?: string;
   firstName?: string;
   lastName?: string;
@@ -28,11 +29,14 @@ export interface LinkedInProfile {
   experience?: ExperienceItem[];
   education?: EducationItem[];
   certifications?: CertificationItem[];
+  languages?: unknown[];
   skills?: SkillItem[];
   projects?: unknown[];
   volunteering?: unknown[];
   receivedRecommendations?: RecommendationItem[];
   moreProfiles?: RelatedProfile[];
+  publications?: unknown[];
+  websites?: unknown[];
   featured?: unknown;
   composeOptionType?: string;
   originalQuery?: { query?: string };

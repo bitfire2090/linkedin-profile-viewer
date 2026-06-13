@@ -1,5 +1,13 @@
 import { MongoClient, Collection, Db } from "mongodb";
-import { ApifyTokenRecord, RocketReachRecord, SearchEventRecord, SearchRecord, SessionRecord, UserRecord } from "./models";
+import {
+  ApifyTokenRecord,
+  AppSettingsRecord,
+  RocketReachRecord,
+  SearchEventRecord,
+  SearchRecord,
+  SessionRecord,
+  UserRecord,
+} from "./models";
 
 const options = {};
 let client: MongoClient | undefined;
@@ -96,6 +104,16 @@ export async function getApifyTokenCollection(): Promise<Collection<ApifyTokenRe
   await collection.createIndex({ isActive: 1 }, { unique: true, partialFilterExpression: { isActive: true } });
   await collection.createIndex({ updatedAt: -1 });
   await collection.createIndex({ createdAt: -1 });
+
+  return collection;
+}
+
+export async function getAppSettingsCollection(): Promise<Collection<AppSettingsRecord>> {
+  const db = await getDb();
+  const collection = db.collection<AppSettingsRecord>("appSettings");
+
+  await collection.createIndex({ key: 1 }, { unique: true });
+  await collection.createIndex({ updatedAt: -1 });
 
   return collection;
 }

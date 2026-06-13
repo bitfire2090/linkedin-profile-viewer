@@ -92,6 +92,10 @@ export const apifyTokenUpdateSchema = z
     "At least one token field must be updated.",
   );
 
+export const apifyActorUpdateSchema = z.object({
+  actorId: z.string().trim().min(1, "Apify actor is required").max(200, "Apify actor id is too long"),
+});
+
 export function normalizeLinkedInUrl(raw: string) {
   const trimmed = raw.trim();
 

@@ -82,3 +82,18 @@ export interface ApifyTokenDTO {
   usageFetchedAt: string | null;
   usageError: string | null;
 }
+
+export interface ApifyActorOptionDTO {
+  id: string;
+  label: string;
+  description: string;
+  inputKind: "profileScraperModeQueries" | "queriesOnly";
+  outputKind: "currentProfile" | "unseenuserLinkedInProfile";
+}
+
+export interface ApifyActorSettingsDTO {
+  selectedActorId: string;
+  selectedActor: ApifyActorOptionDTO;
+  actors: ApifyActorOptionDTO[];
+  updatedAt: string | null;
+}

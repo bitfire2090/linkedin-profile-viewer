@@ -7,13 +7,13 @@ Full-stack Next.js (App Router) app that scrapes LinkedIn profiles via Apify, ca
 2. Create `.env.local`:
    ```
    APIFY_TOKEN=your-apify-token
-   APIFY_ACTOR_ID=your-actor-id
+   APIFY_ACTOR_ID=your-actor-id # optional fallback actor shown in admin settings
    APIFY_PROFILE_MODE="Profile details no email ($4 per 1k)" # optional, matches actor input
    MONGODB_URI=mongodb+srv://...
    APP_ADMIN_USERNAME=admin # optional but recommended
    APP_ADMIN_PASSWORD=change-this-password # optional but recommended
    ```
-   The actor should accept `profileScraperMode` and `queries: [<profile-url>]` and output data in the shape shown in `src/types/linkedin.ts`.
+   Admins can select the global Apify actor in the admin panel. The app supports the configured `APIFY_ACTOR_ID` actor with `profileScraperMode` + `queries` input, and `unseenuser/LinkedIn-Profile` with `queries` input. Scraper output is normalized into the shape shown in `src/types/linkedin.ts`.
 3. Run dev server: `npm run dev` then open http://localhost:3000
 
 ## Auth and roles
@@ -32,6 +32,7 @@ Full-stack Next.js (App Router) app that scrapes LinkedIn profiles via Apify, ca
 - `GET /api/history?page=1&pageSize=8` — paginated shared search history from MongoDB.
 - `GET /api/usage` — aggregate usage metrics, recent search activity, and per-user search totals for approved users.
 - `PATCH /api/admin/users/:userId` — admin-only user actions: approve, disable, enable.
+- `GET/PATCH /api/admin/apify-settings` - admin-only global Apify actor selection.
 
 ## Security
 - Get approved after register the user
@@ -41,5 +42,6 @@ Full-stack Next.js (App Router) app that scrapes LinkedIn profiles via Apify, ca
 - Mongo collection `users` stores account status and roles.
 - Mongo collection `sessions` stores expiring session tokens.
 - Mongo collection `searchEvents` stores per-user search activity for usage reporting.
+- Mongo collection `appSettings` stores the global Apify actor selection used by all users.
 - UI is Tailwind-powered (Next.js + Tailwind CSS v4). All types for the scraper payload live in `src/types/linkedin.ts`.
 
