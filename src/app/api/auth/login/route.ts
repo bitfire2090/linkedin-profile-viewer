@@ -18,7 +18,7 @@ export async function POST(request: Request) {
       requiresApproval: false,
     });
 
-    applySessionCookie(response, session.token, session.expiresAt);
+    applySessionCookie(request, response, session.token, session.expiresAt);
 
     return response;
   } catch (error) {

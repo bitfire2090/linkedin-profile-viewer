@@ -4,7 +4,7 @@ import { handleRouteError } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const sessionUser = await getCurrentSessionUser();
 
@@ -16,7 +16,7 @@ export async function GET() {
         },
         { status: 401 },
       );
-      clearSessionCookie(response);
+      clearSessionCookie(request, response);
       return response;
     }
 

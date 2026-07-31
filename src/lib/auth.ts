@@ -250,28 +250,39 @@ export async function requireAdminUser() {
   return sessionUser;
 }
 
-export function applySessionCookie(response: NextResponse, token: string, expiresAt: Date) {
+export function applySessionCookie(request: Request, response: NextResponse, token: string, expiresAt: Date) {
   response.cookies.set({
     name: SESSION_COOKIE_NAME,
     value: token,
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: shouldUseSecureSessionCookie(request),
     path: "/",
     expires: expiresAt,
   });
 }
 
-export function clearSessionCookie(response: NextResponse) {
+export function clearSessionCookie(request: Request, response: NextResponse) {
   response.cookies.set({
     name: SESSION_COOKIE_NAME,
     value: "",
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: shouldUseSecureSessionCookie(request),
     path: "/",
     expires: new Date(0),
   });
+}
+
+/**
+ * `next start` always runs with NODE_ENV=production, but it can still be
+ * served directly over HTTP. Secure cookies are rejected by browsers on an
+ * HTTP origin, so derive this from the request protocol instead. Reverse
+ * proxies should forward X-Forwarded-Proto to preserve HTTPS cookie security.
+ */
+function shouldUseSecureSessionCookie(request: Request) {
+  const forwardedProtocol = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
+  return forwardedProtocol === "https" || new URL(request.url).protocol === "https:";
 }
 
 async function getSessionToken() {
