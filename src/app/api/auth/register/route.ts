@@ -22,7 +22,7 @@ export async function POST(request: Request) {
 
     if (shouldCreateSession) {
       const session = await createSessionForUser(user);
-      applySessionCookie(response, session.token, session.expiresAt);
+      applySessionCookie(request, response, session.token, session.expiresAt);
     }
 
     return response;

@@ -28,6 +28,14 @@ Full-stack Next.js (App Router) app that scrapes LinkedIn profiles via Apify, ca
 - `POST /api/auth/login` — body: `{ username, password }`; signs in approved, enabled users.
 - `POST /api/auth/logout` — clears the active session cookie.
 - `GET /api/auth/session` — returns the current signed-in user.
+
+### Running behind HTTP or a reverse proxy
+
+Session cookies are marked `Secure` only when the incoming request is HTTPS. This lets `npm run build` followed by `npm start` work when served directly over HTTP, while retaining secure cookies on HTTPS deployments. When TLS is terminated by a reverse proxy, forward the original protocol so the application can keep the cookie secure:
+
+```nginx
+proxy_set_header X-Forwarded-Proto $scheme;
+```
 - `POST /api/search` — body: `{ url: "https://www.linkedin.com/in/..." }`; returns cached data if present, otherwise triggers Apify and stores the result. Search requests are logged per user.
 - `GET /api/history?page=1&pageSize=8` — paginated shared search history from MongoDB.
 - `GET /api/usage` — aggregate usage metrics, recent search activity, and per-user search totals for approved users.
@@ -44,4 +52,3 @@ Full-stack Next.js (App Router) app that scrapes LinkedIn profiles via Apify, ca
 - Mongo collection `searchEvents` stores per-user search activity for usage reporting.
 - Mongo collection `appSettings` stores the global Apify actor selection used by all users.
 - UI is Tailwind-powered (Next.js + Tailwind CSS v4). All types for the scraper payload live in `src/types/linkedin.ts`.
-
